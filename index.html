@@ -3,277 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>狼人殺上帝助手 Pro</title>
-    <style>
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background: #121212;
-            color: #e0e0e0;
-            text-align: center;
-            padding: 20px;
-            margin: 0;
-        }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-        }
-        h1 {
-            color: #ff4757;
-            margin-bottom: 30px;
-            font-size: 28px;
-            letter-spacing: 2px;
-        }
-        .card {
-            background: #1e1e1e;
-            padding: 20px;
-            margin-bottom: 25px;
-            border-radius: 15px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
-            border: 1px solid #2f3542;
-        }
-        h2 {
-            font-size: 18px;
-            margin-top: 0;
-            color: #ffa502;
-            border-bottom: 1px solid #2f3542;
-            padding-bottom: 10px;
-        }
-        /* 計時器樣式 */
-        #timer-display {
-            font-size: 64px;
-            font-weight: bold;
-            color: #2ed573;
-            margin: 15px 0;
-            font-family: monospace;
-        }
-        input[type="number"] {
-            background: #2f3542;
-            color: white;
-            border: none;
-            padding: 10px;
-            font-size: 16px;
-            width: 70px;
-            text-align: center;
-            border-radius: 8px;
-        }
-        /* 隨機號碼樣式 */
-        #result-display {
-            font-size: 72px;
-            font-weight: bold;
-            color: #1e90ff;
-            margin: 15px 0;
-            height: 90px;
-            line-height: 90px;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            margin: 20px 0;
-        }
-        .num-box {
-            background: #2f3542;
-            padding: 12px 0;
-            border-radius: 8px;
-            cursor: pointer;
-            user-select: none;
-            font-weight: bold;
-            transition: all 0.2s;
-            border: 2px solid transparent;
-        }
-        .num-box.excluded {
-            background: #121212;
-            color: #57606f;
-            text-decoration: line-through;
-            border-color: #ff4757;
-        }
-        /* 按鈕樣式 */
-        button {
-            background: #ff4757;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            margin: 5px;
-            transition: background 0.2s;
-        }
-        button:hover { background: #ff6b81; }
-        button.btn-secondary { background: #747d8c; }
-        button.btn-secondary:hover { background: #a4b0be; }
-        button.btn-success { background: #2ed573; }
-        button.btn-success:hover { background: #5edbb7; }
-    </style>
+    <title>狼人殺法官票行記錄器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-3 select-none flex flex-col justify-between" x-data="wolfGame()">
 
-<div class="container">
-    <h1>🐺 狼人殺上帝助手 Pro 👁️</h1>
+    <div class="max-w-md mx-auto w-full space-y-3">
+        <!-- 頂部標題與人數切換 -->
+        <header class="flex justify-between items-center bg-slate-800 px-4 py-2.5 rounded-xl shadow border border-slate-700">
+            <div>
+                <h1 class="text-base font-bold text-amber-400">🐺 狼人殺票行記錄器</h1>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="text-[10px] text-slate-400">總人數：</span>
+                    <select x-model.number="playerCount" @change="updatePlayerCount()" class="bg-slate-700 text-xs text-amber-300 font-bold rounded px-1.5 py-0.5 outline-none border border-slate-600">
+                        <template x-for="n in [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]" :key="n">
+                            <option :value="n" x-text="`${n} 人局`"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+            <button @click="resetCurrentGame" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1.5 rounded-lg transition font-medium text-slate-200 shadow active:scale-95">
+                🔄 開新局
+            </button>
+        </header>
 
-    <div class="card">
-        <h2>⏱️ 發言倒數（支援後台與音效）</h2>
-        <div id="timer-display">60</div>
-        <div style="margin-bottom: 15px;">
-            設定秒數：<input type="number" id="input-seconds" value="60" min="1"> 秒
-        </div>
-        <button class="btn-success" onclick="startTimer()">開始</button>
-        <button class="btn-secondary" onclick="pauseTimer()">暫停</button>
-        <button class="btn-secondary" onclick="resetTimer()">重設</button>
+        <!-- 1. 手機友好的生死與上警控制區 -->
+        <section class="bg-slate-800 p-3 rounded-xl shadow border border-slate-700 space-y-2">
+            <div class="flex justify-between items-center cursor-pointer select-none" @click="isAliveCollapsed = !isAliveCollapsed">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-300">⚙️ 玩家生死與上警設定</span>
+                    <span class="text-[10px] text-slate-400">
+                        ( 存活: <span class="text-green-400 font-bold" x-text="players.filter(p=>p.alive).length"></span> | 警上: <span class="text-amber-400 font-bold" x-text="players.filter(p=>p.onSheriff).length"></span> )
+                    </span>
+                </div>
+                <button class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                    <span x-text="isAliveCollapsed ? '▶ 展開設定' : '▼ 折疊'"></span>
+                </button>
+            </div>
+
+            <div x-show="!isAliveCollapsed" class="space-y-2 pt-1" x-transition>
+                <!-- 點擊模式切換 toggle -->
+                <div class="bg-slate-900/80 p-1.5 rounded-lg border border-slate-700 flex justify-between items-center text-xs">
+                    <span class="text-slate-400 text-[11px] font-medium pl-1">目前點擊模式：</span>
+                    <div class="flex gap-1">
+                        <button @click="editMode = 'status'" 
+                                :class="editMode === 'status' ? 'bg-red-600 text-white font-bold' : 'bg-slate-800 text-slate-400'"
+                                class="px-2.5 py-1 rounded-md text-xs transition">
+                            💀 點擊切換生死
+                        </button>
+                        <button @click="editMode = 'sheriff'" 
+                                :class="editMode === 'sheriff' ? 'bg-amber-500 text-slate-900 font-bold' : 'bg-slate-800 text-slate-400'"
+                                class="px-2.5 py-1 rounded-md text-xs transition">
+                            👑 點擊切換警上
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 玩家按鈕矩陣 -->
+                <div class="grid grid-cols-6 gap-1">
+                    <template x-for="p in players" :key="p.id">
+                        <button @click="handlePlayerClick(p.id)" 
+                                :class="!p.alive ? 'bg-red-950/60 text-red-400 border-red-800 line-through opacity-50' : (p.onSheriff ? 'bg-amber-500 text-slate-900 border-amber-300 font-bold shadow' : 'bg-slate-700 text-slate-300 border-slate-600')"
+                                class="border rounded py-1.5 text-center text-xs transition active:scale-95 flex flex-col items-center">
+                            <span x-text="`${p.id}號`"></span>
+                            <span class="text-[9px]" x-text="!p.alive ? '💀 死亡' : (p.onSheriff ? '👑 警上' : '警下')"></span>
+                        </button>
+                    </template>
+                </div>
+                <div class="flex justify-end pt-0.5">
+                    <button @click="resetSheriffStatus" class="text-[11px] text-indigo-400 hover:text-indigo-300">清空所有警上標記</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 以「被投號碼」為核心的唱票區 -->
+        <section class="bg-slate-800 p-3.5 rounded-xl shadow space-y-3 border border-slate-700">
+            <!-- 輪次標籤快速切換區 -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-indigo-400 flex items-center gap-1">
+                        唱票階段：
+                        <span x-show="currentRoundTag === '上警'" class="text-[10px] bg-amber-950/80 text-amber-300 px-1.5 py-0.5 rounded border border-amber-700/60">⚠️ 僅限警下投票</span>
+                    </span>
+                    <div class="flex gap-2">
+                        <button @click="clearCurrentVotes" class="text-xs text-slate-400 hover:text-red-400 px-2 py-1">清空此輪</button>
+                        <button @click="archiveCurrentVotes" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-2.5 py-1 rounded-lg font-bold transition shadow active:scale-95">
+                            💾 歸檔本輪票行
+                        </button>
+                    </div>
+                </div>
+                <div class="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                    <template x-for="(phase, idx) in phaseList" :key="idx">
+                        <button @click="currentRoundTag = phase" 
+                                :class="currentRoundTag === phase ? 'bg-amber-500 text-slate-900 font-bold border-amber-400' : 'bg-slate-700 text-slate-300 border-slate-600'"
+                                class="px-2.5 py-1 rounded-lg text-xs border whitespace-nowrap transition flex-shrink-0"
+                                x-text="phase">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- 計票明細列表 (死亡號碼自動隱藏) -->
+            <div class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                <template x-for="target in (currentRoundTag === '上警' ? players.filter(p => p.alive && p.onSheriff) : players.filter(p => p.alive))" :key="target.id">
+                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-700/80 space-y-1.5">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-bold text-amber-400 text-xs" x-text="`投 ${target.id} 號${target.onSheriff ? ' (警上)' : ''}：`"></span>
+                                <span class="text-indigo-300 font-bold text-xs" x-text="getVotersForTarget(target.id).join('、') || '無'"></span>
+                            </div>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-950 border border-indigo-700/50 text-indigo-400"
+                                  x-text="`${getVotersForTarget(target.id).length} 票`">
+                            </span>
+                        </div>
+
+                        <!-- 投票者選擇欄 (死亡/警上無投票權玩家按鈕自動禁用) -->
+                        <div class="grid grid-cols-6 gap-1 pt-1">
+                            <template x-for="voter in players" :key="voter.id">
+                                <button @click="toggleVote(voter.id, target.id)"
+                                        :disabled="!canVote(voter)"
+                                        :class="!canVote(voter) ? 'bg-slate-800 text-slate-600 border-slate-800 opacity-20 cursor-not-allowed line-through' : (currentVotes[voter.id] === target.id ? 'bg-indigo-600 text-white font-bold border-indigo-400 shadow scale-95' : 'bg-slate-700/70 text-slate-300 border-slate-600 hover:bg-slate-600')"
+                                        class="py-1 rounded text-xs border transition active:scale-95"
+                                        x-text="voter.id">
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
+                <div x-show="currentRoundTag === '上警' && players.filter(p => p.alive && p.onSheriff).length === 0" class="text-xs text-slate-500 text-center py-4">
+                    請先在上方展開「⚙️ 玩家生死與上警設定」切換成👑模式，點擊標記上警玩家！
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. 個人投票軌跡總覽 -->
+        <section class="bg-slate-800 p-3 rounded-xl shadow space-y-2 border border-slate-700">
+            <div class="flex justify-between items-center cursor-pointer select-none" @click="isTrackCollapsed = !isTrackCollapsed">
+                <h2 class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                    <span>🔍 個人投票軌跡 (至今)</span>
+                </h2>
+                <button class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                    <span x-text="isTrackCollapsed ? '▶ 展開' : '▼ 折疊'"></span>
+                </button>
+            </div>
+
+            <div x-show="!isTrackCollapsed" class="space-y-2 pt-1" x-transition>
+                <div class="grid grid-cols-6 gap-1">
+                    <template x-for="p in players" :key="p.id">
+                        <button @click="trackPlayerId = p.id" 
+                                :class="trackPlayerId === p.id ? 'bg-amber-500 text-slate-900 font-bold border-amber-400' : 'bg-slate-700 text-slate-300 border-slate-600'"
+                                class="py-1 rounded text-xs border transition"
+                                x-text="`${p.id}號`">
+                        </button>
+                    </template>
+                </div>
+
+                <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-700/80 space-y-1.5">
+                    <div class="font-bold text-amber-400 text-[11px]" x-text="`📜 ${trackPlayerId} 號本局至今的投票軌跡：`"></div>
+                    
+                    <div class="space-y-1 max-h-32 overflow-y-auto pr-1">
+                        <template x-for="(item, idx) in playerTrackList" :key="idx">
+                            <div class="flex justify-between items-center bg-slate-800 px-2.5 py-1 rounded text-[11px] border border-slate-700/50">
+                                <span class="font-bold text-indigo-300" x-text="item.tag"></span>
+                                <div class="font-semibold">
+                                    <span class="text-slate-400 text-[10px]">投給 ➔ </span>
+                                    <span :class="item.target ? 'text-amber-300 font-bold' : 'text-slate-500'" 
+                                          x-text="item.target ? `${item.target} 號` : '棄票/未投'"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="playerTrackList.length === 0" class="text-[10px] text-slate-500 text-center py-1.5">
+                            該號碼至今尚無歸檔的投票紀錄
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 分輪票行總覽 -->
+        <section class="bg-slate-800 p-3 rounded-xl shadow space-y-2 border border-slate-700">
+            <div class="flex justify-between items-center cursor-pointer select-none" @click="isHistoryCollapsed = !isHistoryCollapsed">
+                <h2 class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span>📜 分輪票行總覽</span>
+                    <span class="text-[10px] text-slate-400" x-text="`(${historyRounds.length} 輪)`"></span>
+                </h2>
+                <button class="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
+                    <span x-text="isHistoryCollapsed ? '▶ 展開' : '▼ 折疊'"></span>
+                </button>
+            </div>
+
+            <div x-show="!isHistoryCollapsed" class="space-y-2 max-h-40 overflow-y-auto pr-1 pt-1" x-transition>
+                <template x-for="(round, rIdx) in historyRounds" :key="rIdx">
+                    <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-700 space-y-1">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-indigo-300" x-text="round.tag"></span>
+                            <button @click="historyRounds.splice(rIdx, 1); saveHistoryLocal()" class="text-slate-500 hover:text-red-400 text-xs">刪除這輪</button>
+                        </div>
+                        
+                        <div class="bg-slate-800/80 p-2 rounded text-[11px] space-y-1">
+                            <template x-for="tally in getTallies(round.votes)" :key="tally.targetId">
+                                <div class="flex justify-between text-slate-200">
+                                    <div>
+                                        <span class="font-bold text-amber-400 mr-1.5" x-text="`${tally.targetId}號`"></span>
+                                        <span class="text-slate-400 text-[10px]" x-text="`(${tally.voters.join(', ')} 投)`"></span>
+                                    </div>
+                                    <span class="font-bold text-indigo-400" x-text="`${tally.count} 票`"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="historyRounds.length === 0" class="text-xs text-slate-500 text-center py-2">目前尚無歸檔的歷史票行</div>
+            </div>
+        </section>
     </div>
 
-    <div class="card">
-        <h2>🎲 隨機號碼抽籤 (1-12)</h2>
-        <div style="font-size: 14px; color: #a4b0be;">提示：點擊數字可【排除】已出局的玩家</div>
-        
-        <div class="grid" id="number-grid"></div>
+    <script>
+        function wolfGame() {
+            return {
+                playerCount: JSON.parse(localStorage.getItem('wolf_player_count') || '12'),
+                trackPlayerId: 1,
+                editMode: 'status', // 'status': 編輯生死, 'sheriff': 編輯警上
+                isAliveCollapsed: false,
+                isTrackCollapsed: false,
+                isHistoryCollapsed: true,
+                phaseList: ['上警', '第一天', '第一天 PK', '第二天', '第二天 PK', '第三天', '第三天 PK', '第四天'],
+                currentRoundTag: '上警',
+                players: [],
+                currentVotes: JSON.parse(localStorage.getItem('wolf_current_votes') || '{}'),
+                historyRounds: JSON.parse(localStorage.getItem('wolf_history_rounds') || '[]'),
 
-        <div id="result-display">?</div>
-        <button onclick="drawNumber()">隨機抽一個號碼</button>
-        <button class="btn-secondary" onclick="resetDraw()">重置抽籤</button>
-    </div>
-</div>
+                init() {
+                    let savedPlayers = JSON.parse(localStorage.getItem('wolf_players'));
+                    if (savedPlayers && savedPlayers.length === this.playerCount) {
+                        this.players = savedPlayers;
+                    } else {
+                        this.initPlayers();
+                    }
+                },
+                initPlayers() {
+                    this.players = Array.from({length: this.playerCount}, (_, i) => ({ id: i + 1, alive: true, onSheriff: false }));
+                    this.savePlayersLocal();
+                },
+                updatePlayerCount() {
+                    localStorage.setItem('wolf_player_count', this.playerCount);
+                    this.initPlayers();
+                    this.trackPlayerId = 1;
+                    this.currentVotes = {};
+                    localStorage.removeItem('wolf_current_votes');
+                },
+                // 依據選擇的 editMode 決定點擊行為
+                handlePlayerClick(id) {
+                    if (this.editMode === 'status') {
+                        this.toggleStatus(id);
+                    } else {
+                        this.toggleSheriff(id);
+                    }
+                },
+                toggleStatus(id) {
+                    let p = this.players.find(x => x.id === id);
+                    if (p) {
+                        p.alive = !p.alive;
+                        if (!p.alive) {
+                            delete this.currentVotes[p.id];
+                            p.onSheriff = false;
+                        }
+                        this.savePlayersLocal();
+                        this.saveCurrentVotesLocal();
+                    }
+                },
+                toggleSheriff(id) {
+                    let p = this.players.find(x => x.id === id);
+                    if (p && p.alive) {
+                        p.onSheriff = !p.onSheriff;
+                        this.savePlayersLocal();
+                    }
+                },
+                resetSheriffStatus() {
+                    this.players.forEach(p => p.onSheriff = false);
+                    this.savePlayersLocal();
+                },
+                canVote(voter) {
+                    if (!voter.alive) return false;
+                    if (this.currentRoundTag === '上警' && voter.onSheriff) return false;
+                    return true;
+                },
+                toggleVote(voterId, targetId) {
+                    if (this.currentVotes[voterId] === targetId) {
+                        delete this.currentVotes[voterId];
+                    } else {
+                        this.currentVotes[voterId] = targetId;
+                    }
+                    this.saveCurrentVotesLocal();
+                },
+                getVotersForTarget(targetId) {
+                    let list = [];
+                    for (let voterId in this.currentVotes) {
+                        if (this.currentVotes[voterId] === targetId) {
+                            list.push(Number(voterId));
+                        }
+                    }
+                    return list.sort((a, b) => a - b);
+                },
+                clearCurrentVotes() {
+                    this.currentVotes = {};
+                    localStorage.removeItem('wolf_current_votes');
+                },
+                savePlayersLocal() {
+                    localStorage.setItem('wolf_players', JSON.stringify(this.players));
+                },
+                saveCurrentVotesLocal() {
+                    localStorage.setItem('wolf_current_votes', JSON.stringify(this.currentVotes));
+                },
+                archiveCurrentVotes() {
+                    if (Object.keys(this.currentVotes).length === 0) {
+                        alert('目前尚無任何投票記錄可歸檔！');
+                        return;
+                    }
+                    this.historyRounds.unshift({
+                        tag: this.currentRoundTag,
+                        votes: { ...this.currentVotes }
+                    });
+                    this.saveHistoryLocal();
 
-<script>
-    // --- 高級計時器邏輯（防後台凍結） ---
-    let timerInterval;
-    let endTime; 
-    let timeLeft = 60;
-    let isRunning = false;
-    let wakeLock = null;
-
-    function playAlarm() {
-        try {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let now = audioCtx.currentTime;
-            
-            function scheduleBeep(delay, duration) {
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(880, now + delay);
-                gain.gain.setValueAtTime(0.6, now + delay);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + delay + duration);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start(now + delay);
-                osc.stop(now + delay + duration);
+                    this.currentVotes = {};
+                    localStorage.removeItem('wolf_current_votes');
+                    
+                    let currentIndex = this.phaseList.indexOf(this.currentRoundTag);
+                    if (currentIndex !== -1 && currentIndex < this.phaseList.length - 1) {
+                        this.currentRoundTag = this.phaseList[currentIndex + 1];
+                    }
+                },
+                saveHistoryLocal() {
+                    localStorage.setItem('wolf_history_rounds', JSON.stringify(this.historyRounds));
+                },
+                get playerTrackList() {
+                    let list = [];
+                    let sortedRounds = [...this.historyRounds].reverse();
+                    
+                    sortedRounds.forEach(round => {
+                        let target = round.votes[this.trackPlayerId];
+                        if (target !== undefined) {
+                            list.push({
+                                tag: round.tag,
+                                target: target
+                            });
+                        }
+                    });
+                    return list;
+                },
+                getTallies(votesObj) {
+                    let counts = {};
+                    for (let voterId in votesObj) {
+                        let targetId = votesObj[voterId];
+                        if (!targetId) continue;
+                        if (!counts[targetId]) {
+                            counts[targetId] = { targetId: Number(targetId), count: 0, voters: [] };
+                        }
+                        counts[targetId].count += 1;
+                        counts[targetId].voters.push(Number(voterId));
+                    }
+                    return Object.values(counts).sort((a, b) => b.count - a.count);
+                },
+                resetCurrentGame() {
+                    if (confirm('確定要開新一局嗎？這將清空當前局的所有生死狀態與票行紀錄。')) {
+                        this.currentVotes = {};
+                        this.historyRounds = [];
+                        this.initPlayers();
+                        this.trackPlayerId = 1;
+                        this.currentRoundTag = '上警';
+                        this.isAliveCollapsed = false;
+                        localStorage.clear();
+                        localStorage.setItem('wolf_player_count', this.playerCount);
+                    }
+                }
             }
-            scheduleBeep(0, 0.2);
-            scheduleBeep(0.3, 0.2);
-            scheduleBeep(0.6, 0.4);
-        } catch (e) {
-            console.log("音效播放失敗: ", e);
         }
-    }
-
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
-        }
-    }
-
-    function startTimer() {
-        if (isRunning) return;
-
-        playAlarm(); 
-        requestWakeLock();
-
-        let inputSec = parseInt(document.getElementById('input-seconds').value) || 60;
-        
-        if (timeLeft <= 0 || timeLeft === inputSec) {
-            timeLeft = inputSec;
-        }
-        
-        endTime = Date.now() + (timeLeft * 1000);
-        isRunning = true;
-        document.getElementById('timer-display').style.color = '#2ed573';
-
-        timerInterval = setInterval(() => {
-            let remaining = Math.ceil((endTime - Date.now()) / 1000);
-            
-            if (remaining <= 0) {
-                timeLeft = 0;
-                updateTimerDisplay();
-                clearInterval(timerInterval);
-                isRunning = false;
-                document.getElementById('timer-display').style.color = '#ff4757';
-                playAlarm();
-                if (wakeLock) { wakeLock.release(); wakeLock = null; }
-            } else {
-                timeLeft = remaining;
-                updateTimerDisplay();
-            }
-        }, 200);
-    }
-
-    function pauseTimer() {
-        if (!isRunning) return;
-        clearInterval(timerInterval);
-        isRunning = false;
-        timeLeft = Math.ceil((endTime - Date.now()) / 1000);
-        if (wakeLock) { wakeLock.release(); wakeLock = null; }
-    }
-
-    function resetTimer() {
-        clearInterval(timerInterval);
-        isRunning = false;
-        timeLeft = parseInt(document.getElementById('input-seconds').value) || 60;
-        document.getElementById('timer-display').style.color = '#2ed573';
-        updateTimerDisplay();
-        if (wakeLock) { wakeLock.release(); wakeLock = null; }
-    }
-
-    function updateTimerDisplay() {
-        document.getElementById('timer-display').innerText = timeLeft;
-    }
-
-    // --- 隨機抽籤邏輯 ---
-    const grid = document.getElementById('number-grid');
-    for (let i = 1; i <= 12; i++) {
-        const box = document.createElement('div');
-        box.className = 'num-box';
-        box.innerText = i + ' 號';
-        box.id = 'player-' + i;
-        box.onclick = function() { this.classList.toggle('excluded'); };
-        grid.appendChild(box);
-    }
-
-    function drawNumber() {
-        let pool = [];
-        for (let i = 1; i <= 12; i++) {
-            const box = document.getElementById('player-' + i);
-            if (!box.classList.contains('excluded')) { pool.push(i); }
-        }
-        const resultDisplay = document.getElementById('result-display');
-        if (pool.length === 0) {
-            resultDisplay.innerText = "❌";
-            alert("所有玩家都被排除了！");
-            return;
-        }
-        const randomIndex = Math.floor(Math.random() * pool.length);
-        const luckyNumber = pool[randomIndex];
-        
-        let count = 0;
-        const shuffleInterval = setInterval(() => {
-            resultDisplay.innerText = pool[Math.floor(Math.random() * pool.length)];
-            count++;
-            if (count > 10) {
-                clearInterval(shuffleInterval);
-                resultDisplay.innerText = luckyNumber;
-            }
-        }, 50);
-    }
-
-    function resetDraw() {
-        for (let i = 1; i <= 12; i++) {
-            const box = document.getElementById('player-' + i);
-            if (box) box.classList.remove('excluded');
-        }
-        document.getElementById('result-display').innerText = '?';
-    }
-</script>
-
+    </script>
 </body>
 </html>
