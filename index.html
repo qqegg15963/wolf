@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狼人殺上帝助手 Pro</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #ff4757;
+            margin-bottom: 30px;
+            font-size: 28px;
+            letter-spacing: 2px;
+        }
+        .card {
+            background: #1e1e1e;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            border: 1px solid #2f3542;
+        }
+        h2 {
+            font-size: 18px;
+            margin-top: 0;
+            color: #ffa502;
+            border-bottom: 1px solid #2f3542;
+            padding-bottom: 10px;
+        }
+        /* 計時器樣式 */
+        #timer-display {
+            font-size: 64px;
+            font-weight: bold;
+            color: #2ed573;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        input[type="number"] {
+            background: #2f3542;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-size: 16px;
+            width: 70px;
+            text-align: center;
+            border-radius: 8px;
+        }
+        /* 隨機號碼樣式 */
+        #result-display {
+            font-size: 72px;
+            font-weight: bold;
+            color: #1e90ff;
+            margin: 15px 0;
+            height: 90px;
+            line-height: 90px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .num-box {
+            background: #2f3542;
+            padding: 12px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .num-box.excluded {
+            background: #121212;
+            color: #57606f;
+            text-decoration: line-through;
+            border-color: #ff4757;
+        }
+        /* 按鈕樣式 */
+        button {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #ff6b81; }
+        button.btn-secondary { background: #747d8c; }
+        button.btn-secondary:hover { background: #a4b0be; }
+        button.btn-success { background: #2ed573; }
+        button.btn-success:hover { background: #5edbb7; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🐺 狼人殺上帝助手 Pro 👁️</h1>
+
+    <div class="card">
+        <h2>⏱️ 發言倒數（支援後台與音效）</h2>
+        <div id="timer-display">60</div>
+        <div style="margin-bottom: 15px;">
+            設定秒數：<input type="number" id="input-seconds" value="60" min="1"> 秒
+        </div>
+        <button class="btn-success" onclick="startTimer()">開始</button>
+        <button class="btn-secondary" onclick="pauseTimer()">暫停</button>
+        <button class="btn-secondary" onclick="resetTimer()">重設</button>
+    </div>
+
+    <div class="card">
+        <h2>🎲 隨機號碼抽籤 (1-12)</h2>
+        <div style="font-size: 14px; color: #a4b0be;">提示：點擊數字可【排除】已出局的玩家</div>
+        
+        <div class="grid" id="number-grid"></div>
+
+        <div id="result-display">?</div>
+        <button onclick="drawNumber()">隨機抽一個號碼</button>
+        <button class="btn-secondary" onclick="resetDraw()">重置抽籤</button>
+    </div>
+</div>
+
+<script>
+    // --- 高級計時器邏輯（防後台凍結） ---
+    let timerInterval;
+    let endTime; 
+    let timeLeft = 60;
+    let isRunning = false;
+    let wakeLock = null;
+
+    function playAlarm() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let now = audioCtx.currentTime;
+            
+            function scheduleBeep(delay, duration) {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now + delay);
+                gain.gain.setValueAtTime(0.6, now + delay);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + delay + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + delay);
+                osc.stop(now + delay + duration);
+            }
+            scheduleBeep(0, 0.2);
+            scheduleBeep(0.3, 0.2);
+            scheduleBeep(0.6, 0.4);
+        } catch (e) {
+            console.log("音效播放失敗: ", e);
+        }
+    }
+
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+        }
+    }
+
+    function startTimer() {
+        if (isRunning) return;
+
+        playAlarm(); 
+        requestWakeLock();
+
+        let inputSec = parseInt(document.getElementById('input-seconds').value) || 60;
+        
+        if (timeLeft <= 0 || timeLeft === inputSec) {
+            timeLeft = inputSec;
+        }
+        
+        endTime = Date.now() + (timeLeft * 1000);
+        isRunning = true;
+        document.getElementById('timer-display').style.color = '#2ed573';
+
+        timerInterval = setInterval(() => {
+            let remaining = Math.ceil((endTime - Date.now()) / 1000);
+            
+            if (remaining <= 0) {
+                timeLeft = 0;
+                updateTimerDisplay();
+                clearInterval(timerInterval);
+                isRunning = false;
+                document.getElementById('timer-display').style.color = '#ff4757';
+                playAlarm();
+                if (wakeLock) { wakeLock.release(); wakeLock = null; }
+            } else {
+                timeLeft = remaining;
+                updateTimerDisplay();
+            }
+        }, 200);
+    }
+
+    function pauseTimer() {
+        if (!isRunning) return;
+        clearInterval(timerInterval);
+        isRunning = false;
+        timeLeft = Math.ceil((endTime - Date.now()) / 1000);
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    }
+
+    function resetTimer() {
+        clearInterval(timerInterval);
+        isRunning = false;
+        timeLeft = parseInt(document.getElementById('input-seconds').value) || 60;
+        document.getElementById('timer-display').style.color = '#2ed573';
+        updateTimerDisplay();
+        if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    }
+
+    function updateTimerDisplay() {
+        document.getElementById('timer-display').innerText = timeLeft;
+    }
+
+    // --- 隨機抽籤邏輯 ---
+    const grid = document.getElementById('number-grid');
+    for (let i = 1; i <= 12; i++) {
+        const box = document.createElement('div');
+        box.className = 'num-box';
+        box.innerText = i + ' 號';
+        box.id = 'player-' + i;
+        box.onclick = function() { this.classList.toggle('excluded'); };
+        grid.appendChild(box);
+    }
+
+    function drawNumber() {
+        let pool = [];
+        for (let i = 1; i <= 12; i++) {
+            const box = document.getElementById('player-' + i);
+            if (!box.classList.contains('excluded')) { pool.push(i); }
+        }
+        const resultDisplay = document.getElementById('result-display');
+        if (pool.length === 0) {
+            resultDisplay.innerText = "❌";
+            alert("所有玩家都被排除了！");
+            return;
+        }
+        const randomIndex = Math.floor(Math.random() * pool.length);
+        const luckyNumber = pool[randomIndex];
+        
+        let count = 0;
+        const shuffleInterval = setInterval(() => {
+            resultDisplay.innerText = pool[Math.floor(Math.random() * pool.length)];
+            count++;
+            if (count > 10) {
+                clearInterval(shuffleInterval);
+                resultDisplay.innerText = luckyNumber;
+            }
+        }, 50);
+    }
+
+    function resetDraw() {
+        for (let i = 1; i <= 12; i++) {
+            const box = document.getElementById('player-' + i);
+            if (box) box.classList.remove('excluded');
+        }
+        document.getElementById('result-display').innerText = '?';
+    }
+</script>
+
+</body>
+</html>
